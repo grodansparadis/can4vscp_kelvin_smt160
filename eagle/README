@@ -1,0 +1,5 @@
+Schematics is the same as for Kelvin-NTC with the following
+changes
+
+R1,R8,R10,R13,(R5,R6,C8,THERMISTOR) is not mounted
+R7,R9,R12,R14,R16 is 0R

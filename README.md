@@ -1,2 +1,5 @@
-# can4vscp_kelvin_smt160
-CAN4VSCP module Kelvin SMT-160 
+<h1>Kelvin SMT-160</h1>
+
+<img src="http://grodansparadis.com/images/vscp_logo.jpg" />
+
+This module supports five SMT-160 temperature sensor channels.

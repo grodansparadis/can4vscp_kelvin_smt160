@@ -1,0 +1,10 @@
+Kelvin NTC
+==========
+
+2014-03-22 AKHE - Added mean calculations on temperatures
+2014-03-22 AKHE - Added Calibrated voltage variable
+2012-10-18 AKHE - Fixed paths so code compiles again.
+2012-03-20-AKHE - 10uF C8,C9,C10,C11,C12,C13 Changed from Digikey 493-2328-1-ND to Digikey 445-1371-2-ND 
+				Elfa 65-768-30 is alternativ. 
+				Digikey 445-1371-1-ND is alternativ.
+2012-01-29 AKHE - Started development from old Kelvin SHT

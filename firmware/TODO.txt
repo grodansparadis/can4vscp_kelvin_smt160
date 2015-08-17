@@ -1,0 +1,2 @@
+
+2014-03-23 AKHE - Enable 32 - bit floating bit format. CLASS=70

@@ -1,0 +1,43 @@
+http://www.mikroe.com/forum/viewtopic.php?t=22580
+
+var Teplota_Byte: byte;
+    Timer1: word; absolute $0E;
+
+Procedure MeasureTemp;      //sensor on PORTA.5
+ Begin
+  repeat until PORTA.5 = 0;
+  repeat until PORTA.5 = 1;   // just waiting for log1
+
+  TMR2:=0;                    // clear Timer2, prescaler & postscaler
+  PIR1.TMR2IF:=0;
+  T2CON.TMR2ON:=1;            // start Timer2
+  Timer1:=0;                  // clear Timer1 and start measuring
+  asm
+   btfsc   PORTA,5
+   bsf     T1CON,TMR1ON
+   nop                        // let Timer1 increment twice if RA5 is high
+   nop
+   bcf     T1CON,TMR1ON
+   btfss   PIR1,TMR2IF        // check if 65536 Tcy were counted
+   goto    $-6
+  end;
+  
+  T2CON.TMR2ON:=0;            // stop Timer2
+  Teplota_Byte:=(Timer1-5243)/77;
+ End;
+
+begin
+...
+ INTCON:=0;
+ PIE1:=0;
+ T1CON:=0;    // prescaler 1:1, internal clock
+ T2CON:=$7A;  // prescaler 1:16, postscaler 1:16, 65536us period
+ PR2:=$FF;
+...
+ MeasureTemp;
+...
+END.
+
+Timer2 should count 65536us and set interrupt flag, and Timer1 increments twice every time RA5 is high. The loop in assembly takes 8us, so Timer1 will give 0...16384 counts (Timer1 variable is declared at the address of TMR1L, so the compiler will treat the pair of registers TMR1L & TMR1H as one 16-bit variable). The formula for temperature calculation has been modyfied by multiplying divisor and dividend by 16384. 
+
+For any case, I've added also lines disabling interrupts, but you may use interrupts in your code - just don't enable interrupts of Timer1 & 2 .

@@ -1,0 +1,144 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+   <title>smt160.c</title>
+   <meta name="generator" content="lore's source converter - http://www.source2html.org">
+</head>
+
+<body style="background: #ffffff;">
+
+
+<h1>smt160.c</h1>
+
+Example code for 16F819(8xx), which measures temperature via SMT160-30, 
+shows it on LCD and communicates with RS232 (sends values of temperature 
+to terminal)
+(by <a href="mailto:a501@seznam.cz">Petr Mervart</a>).<br><br>
+
+<hr>
+<pre><code><font color="#000000">
+
+<font color="#000080">// Declaration file for temperatuere measuring via SMT 160/30 sensor</font>
+<font color="#000080">// Major rutine writed in ASM to minimalize measuring errors </font>
+<font color="#000080">//</font>
+<font color="#000080">// This idea to measure temp. is a litlle bit different from clasic one:</font>
+<font color="#000080">// we don't measure a real DUTY CYCLE (DC) and time, when is log1,</font>
+<font color="#000080">// but we are reading sensor (and count if is in log1 -&gt; stridaL) after the same </font>
+<font color="#000080">// period and for the same time (aprox 108ms) then temperature is linear dependence</font>
+<font color="#000080">// on DC and result is in stridaH var.</font>
+<font color="#000080">// The temp. resolution is 0.5C (if stridaL=256 =&gt; stridaH=1 =&gt; 0.5C)</font>
+<font color="#000080">//</font>
+<font color="#000080">// This idea (and ASM rutine) is taken from Ondrej Vitous http://www.hw.cz/programovani/pic_temperature/vitous@hw.cz</font>
+<font color="#000080">// ( only  czech page)</font>
+
+<font color="#008000">#define PORT          PORTB        </font>
+<font color="#008000">#define PIN           2          </font><font color="#000080">// pin number where is sensor </font>
+<font color="#008000">#define CIDLO           PORT,PIN</font>
+<font color="#008000">#define SMT160_INPUT   TRISB,PIN</font>
+<font color="#008000">#define MAX          80     </font>
+<font color="#000080">/* MAX [0-135] </font>
+<font color="#000080">    Tmax = (MAX/2 + 60); ex. MAX=130  =&gt; Tmax=130/2 + 60=125 C</font>
+<font color="#000080">    Tmin = [(MAX+1)-136]/2  when MAX=130 then Tmin=-2,5C  </font>
+<font color="#000080">     =&gt; deltaT=127.5C, resolution 0.5C</font>
+<font color="#000080">       </font>
+<font color="#000080">    MAX         0      10      50      80     100    120     130  135</font>
+<font color="#000080">    Tmax [C]   60      65      85     100     110    120     125    127.5</font>
+<font color="#000080">    Tmin [C]  -67.5*  -62.5*  -42.5   -27.5   -17.5   -7.5    -2      0</font>
+<font color="#000080">       </font>
+<font color="#000080">       * - out of sensor range (-45C - +130C)</font>
+<font color="#000080">*/</font>
+
+<b>char</b> countL ;        <font color="#000080">//  counter lower byte </font>
+<b>char</b> countH ;        <font color="#000080">//  counter higher byte </font>
+<b>char</b> stridaL ;       <font color="#000080">//  log1 lower counter (if stridaL=256 =&gt; 0.5C)   </font>
+<b>char</b> stridaH ;        <font color="#000080">//  log1 higher counter </font>
+<b>char</b> TEMP_J;              <font color="#000080">//  measured tempearture - tenths [C]</font>
+<b>char</b> TEMP_D;          <font color="#000080">//  measured tempearture - tens (hundreds) [C]</font>
+<b>char</b> minus ;            <font color="#000080">//  this is negative values flag, if is 1 we are under zero</font>
+
+
+<b>void</b> temperature()      <font color="#000080">// main rutine</font>
+{
+  TEMP_D=<font color="#0000ff">0</font>;
+  TEMP_J=<font color="#0000ff">0</font>;
+<b>asm</b>
+{
+       MOVLW d<font color="#0000ff">'32'</font>   ;  <font color="#0000ff">2</font> cycles
+       MOVWF _countL
+       MOVLW d<font color="#0000ff">'54'</font>   ;    <font color="#0000ff">2</font>
+       MOVWF _countH
+
+       CLRF _stridaL ;  <font color="#0000ff">1</font>
+       CLRF _stridaH ;  <font color="#0000ff">1</font>
+
+       BCF STATUS,Z  ;  <font color="#0000ff">1</font>
+
+repeatA     nop         ;  <font color="#0000ff">1</font>  measuring loop (sampling time) - <font color="#0000ff">13600x</font>
+repeatB
+
+      BTFSC CIDLO       ;<font color="#0000ff">1</font>/<font color="#0000ff">2</font>
+      INCF  _stridaL,<font color="#0000ff">1</font>  ;<font color="#0000ff">1</font>
+
+      BTFSC STATUS,Z       ;<font color="#0000ff">1</font>/<font color="#0000ff">2</font>
+      INCF  _stridaH,<font color="#0000ff">1</font>    ;<font color="#0000ff">1</font>
+
+         DECFSZ _countL,<font color="#0000ff">1</font>     ;<font color="#0000ff">3</font>/<font color="#0000ff">2</font>
+      GOTO repeatA
+      DECFSZ _countH,<font color="#0000ff">1</font>     ;<font color="#0000ff">3</font>/<font color="#0000ff">2</font>
+      GOTO repeatB
+
+          ; <font color="#0000ff">3x</font> rotate meassured DC
+       BCF STATUS,C
+      RLF _stridaL,<font color="#0000ff">1</font>
+      RLF _stridaH,<font color="#0000ff">1</font>
+      RLF _stridaL,<font color="#0000ff">1</font>
+      RLF _stridaH,<font color="#0000ff">1</font>
+      RLF _stridaL,<font color="#0000ff">1</font>
+      RLF _stridaH,<font color="#0000ff">1</font>
+      ; RETURN
+ }
+     <font color="#000080">// and now convert temperature from DC to degrees (linear dependence)</font>
+     <b>if</b> (stridaH &lt; MAX)     <font color="#000080">//60C - Tmax</font>
+    {
+        minus=<font color="#0000ff">0</font>;
+         TEMP_D=stridaH&gt;&gt;<font color="#0000ff">1</font>;
+       TEMP_J=stridaH;
+       TEMP_D=TEMP_D+<font color="#0000ff">60</font>;
+       <b>if</b> (TEMP_J % <font color="#0000ff">2</font>) TEMP_J=<font color="#0000ff">5</font>;     <font color="#000080">// 0,5 C or 0.0C</font>
+       <b>else</b> TEMP_J=<font color="#0000ff">0</font>;
+    }
+     <b>else</b>
+     {
+        <b>if</b>(stridaH&gt;<font color="#0000ff">135</font>)    <font color="#000080">//(Tmin - 60C)</font>
+       {
+         minus=<font color="#0000ff">0</font>;
+           TEMP_D=(stridaH - <font color="#0000ff">136</font>);      <font color="#000080">// ex.TEMP_J=185-136 = 49C</font>
+         TEMP_J=TEMP_D;
+         TEMP_D&gt;&gt;=<font color="#0000ff">1</font>;                  <font color="#000080">// temp_d/2</font>
+         <b>if</b> (TEMP_J % <font color="#0000ff">2</font>) TEMP_J=<font color="#0000ff">5</font>;    <font color="#000080">// 0,5 C</font>
+         <b>else</b> TEMP_J=<font color="#0000ff">0</font>;
+       }
+        <b>else</b>              <font color="#000080">// (Tmin - 0C) ex. stridaH=130 =&gt; t=(136-130)/2=-3C</font>
+        {
+           minus=<font color="#0000ff">1</font>;
+           TEMP_D=(<font color="#0000ff">136</font>-stridaH);
+         TEMP_J=TEMP_D;
+         TEMP_D&gt;&gt;=<font color="#0000ff">1</font>;
+         <b>if</b> (TEMP_J % <font color="#0000ff">2</font>) TEMP_J=<font color="#0000ff">5</font>;
+         <b>else</b> TEMP_J=<font color="#0000ff">0</font>;
+      }
+   }
+}
+
+</font>
+</code></pre>
+
+
+<hr><address style="align: right;">
+<a href="http://www.sourceboost.com/home.html">http://www.sourceboost.com/home.html</a>
+</address>
+
+<p>Copyright © 2002-2006 SourceBoost Technologies</p>
+
+
+</body></html>
